@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marcar letra</title>
+<style>
+  :root { color-scheme: dark; --fondo:#0b0b0b; --panel:#181818; --borde:#2c2c2c; --texto:#f2f2f2;
+          --tenue:#8a8a8a; --amarillo:#ffdd00; --verde:#3ddc84; --rojo:#ff6b6b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.4 system-ui, "Segoe UI", sans-serif; background:var(--fondo); color:var(--texto); }
+  header { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; padding:12px 20px;
+           background:var(--panel); border-bottom:1px solid var(--borde); }
+  #titulo { font:600 20px system-ui, sans-serif; background:transparent; color:var(--texto);
+            border:1px solid transparent; border-radius:6px; padding:4px 6px; min-width:260px; flex:1; }
+  #titulo:hover, #titulo:focus { border-color:var(--borde); background:#000; }
+  .control { display:flex; align-items:center; gap:6px; color:var(--tenue); font-size:14px; }
+  select, input[type=number] { font:inherit; background:#000; color:var(--texto); border:1px solid var(--borde);
+                               border-radius:6px; padding:3px 6px; }
+  input[type=number] { width:5em; }
+  #reloj { font-variant-numeric:tabular-nums; color:var(--texto); }
+  #barra { height:4px; background:#222; }
+  #barra > div { height:100%; width:0; background:var(--amarillo); }
+
+  .escenario { display:grid; grid-template-columns:1fr 1fr; min-height:42vh; background:#000; }
+  .lado { display:flex; flex-direction:column; justify-content:center; align-items:center; padding:24px 32px;
+          text-align:center; }
+  .lado + .lado { border-left:1px solid #1a1a1a; }
+  .etiqueta { color:var(--tenue); font-size:13px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:14px; }
+  .grande { font-weight:700; font-size:clamp(26px, 3.6vw, 56px); line-height:1.2; min-height:1.2em; }
+  #actual { color:var(--amarillo); }
+  #despues { color:var(--tenue); font-size:clamp(18px, 2vw, 28px); margin-top:18px; font-weight:600; }
+
+  .aviso { padding:10px 20px; font-size:18px; text-align:center; background:var(--panel); border-bottom:1px solid var(--borde); }
+  .aviso.ok { color:var(--verde); } .aviso.error { color:var(--rojo); }
+  .teclas { padding:8px 20px; color:var(--tenue); font-size:14px; text-align:center; }
+  kbd { background:#2a2a2a; border:1px solid #3a3a3a; border-bottom-width:2px; border-radius:4px; padding:0 6px;
+        color:var(--texto); font:12px ui-monospace, monospace; }
+
+  .lista { max-height:34vh; overflow:auto; border-top:1px solid var(--borde); }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:6px 12px; border-bottom:1px solid #161616; }
+  td.n { width:3em; text-align:right; color:var(--tenue); }
+  td.t { width:6em; font-variant-numeric:tabular-nums; color:var(--tenue); }
+  td.b { width:3em; text-align:right; }
+  tr.marcada td.t { color:var(--texto); }
+  tr.suena td.x { color:var(--amarillo); font-weight:600; }
+  tr.proxima { background:#1d2433; }
+  tr.estrofa td { border-top:2px solid #333; }
+  button { font:inherit; border-radius:8px; border:1px solid #444; background:#262626; color:var(--texto);
+           padding:8px 16px; cursor:pointer; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.principal { background:var(--amarillo); border-color:var(--amarillo); color:#000; font-weight:700; }
+  button.mini { padding:2px 8px; font-size:13px; }
+  footer { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:center; padding:14px 20px;
+           background:var(--panel); border-top:1px solid var(--borde); position:sticky; bottom:0; }
+  #progreso { color:var(--tenue); font-size:14px; }
+</style>
+</head>
+<body>
+<header>
+  <input id="titulo" title="Título que aparece grande al inicio del video" spellcheck="false">
+  <span class="control"><span id="reloj">0:00 / 0:00</span></span>
+  <label class="control">Velocidad
+    <select id="velocidad" title="Más lento = marcas más precisas (los tiempos siguen siendo los reales)">
+      <option value="1">1×</option><option value="0.9">0,9×</option><option value="0.75">0,75×</option>
+    </select></label>
+  <label class="control" title="Se resta a cada marca para compensar el tiempo de reacción">Adelanto
+    <input id="adelanto" type="number" min="0" max="1" step="0.05" value="0.15"> s</label>
+</header>
+<div id="barra"><div></div></div>
+
+<main class="escenario">
+  <section class="lado">
+    <div class="etiqueta">Se está cantando</div>
+    <div id="actual" class="grande"></div>
+  </section>
+  <section class="lado">
+    <div class="etiqueta" id="etiquetaSiguiente">Siguiente: pulsa ESPACIO cuando empiece</div>
+    <div id="siguiente" class="grande"></div>
+    <div id="despues"></div>
+  </section>
+</main>
+
+<div id="aviso" class="aviso">Pulsa <kbd>Espacio</kbd> para iniciar la canción</div>
+<div class="teclas">
+  <kbd>Espacio</kbd> marcar el inicio de la siguiente línea ·
+  <kbd>Shift</kbd> borrar la última marca ·
+  <kbd>P</kbd> pausa ·
+  <kbd>←</kbd> retroceder 5 s (borra las marcas de ese tramo) ·
+  <kbd>Enter</kbd> fin de la parte (opcional, antes de un instrumental)
+</div>
+
+<section class="lista"><table><tbody id="filas"></tbody></table></section>
+
+<footer>
+  <span id="progreso"></span>
+  <button id="terminar" class="principal" tabindex="-1" disabled>Terminar y generar video</button>
+  <button id="abrir" tabindex="-1" hidden>Abrir carpeta del video</button>
+  <button id="cerrar" tabindex="-1" hidden>Cerrar programa</button>
+</footer>
+
+<audio id="audio" preload="auto" src="audio"></audio>
+
+<script>
+const D = __DATOS__;
+const n = D.lineas.length;
+const audio = document.getElementById("audio");
+const $ = id => document.getElementById(id);
+let eventos = [];          // {tipo:"inicio"|"fin", linea, t}  (en orden de tiempo)
+let generando = false;
+let sondeo = null;
+
+// Marcas guardadas antes para esta misma letra: se pueden corregir sin empezar de cero.
+if (Array.isArray(D.inicios)) {
+  D.inicios.forEach((t, i) => {
+    eventos.push({ tipo: "inicio", linea: i, t });
+    if (D.fines[i] != null) eventos.push({ tipo: "fin", linea: i, t: D.fines[i] });
+  });
+}
+$("titulo").value = D.titulo;
+
+function inicios() {
+  const r = new Array(n).fill(null);
+  eventos.forEach(e => { if (e.tipo === "inicio") r[e.linea] = e.t; });
+  return r;
+}
+function fines() {
+  const r = {};
+  eventos.forEach(e => { if (e.tipo === "fin") r[e.linea] = e.t; });
+  return r;
+}
+function siguiente() { return eventos.filter(e => e.tipo === "inicio").length; }
+function adelanto() { return Math.max(0, parseFloat($("adelanto").value) || 0); }
+function reloj(t) { if (!isFinite(t)) t = 0; const m = Math.floor(t / 60), s = Math.floor(t % 60); return `${m}:${String(s).padStart(2, "0")}`; }
+function avisar(texto, clase = "") { const a = $("aviso"); a.innerHTML = texto; a.className = "aviso " + clase; }
+
+// ---------------------------------------------------------------- lista de líneas
+function construirLista() {
+  const tb = $("filas");
+  tb.innerHTML = "";
+  D.lineas.forEach((l, i) => {
+    const tr = document.createElement("tr");
+    if (l.estrofa_nueva) tr.classList.add("estrofa");
+    tr.innerHTML = `<td class="n">${i + 1}</td><td class="t">—</td><td class="x"></td>
+      <td class="b"><button class="mini" tabindex="-1" title="Rehacer desde esta línea">↺</button></td>`;
+    tr.querySelector(".x").textContent = l.texto;
+    const b = tr.querySelector("button");
+    b.addEventListener("mousedown", e => e.preventDefault());
+    b.addEventListener("click", () => rehacerDesde(i));
+    tb.appendChild(tr);
+  });
+}
+
+function pintar() {
+  const ini = inicios(), sig = siguiente(), t = audio.currentTime;
+  $("actual").textContent = sig > 0 ? D.lineas[sig - 1].texto : "";
+  $("siguiente").textContent = sig < n ? D.lineas[sig].texto : "";
+  $("despues").textContent = sig + 1 < n ? D.lineas[sig + 1].texto : "";
+  $("etiquetaSiguiente").textContent = sig < n ? `Siguiente (${sig + 1} de ${n}): pulsa ESPACIO cuando empiece`
+                                              : "¡Todas las líneas marcadas!";
+  let suena = -1;
+  ini.forEach((x, i) => { if (x != null && x <= t) suena = i; });
+  [...$("filas").children].forEach((tr, i) => {
+    tr.querySelector(".t").textContent = ini[i] == null ? "—" : ini[i].toFixed(2);
+    tr.classList.toggle("marcada", ini[i] != null);
+    tr.classList.toggle("suena", i === suena);
+    tr.classList.toggle("proxima", i === sig);
+  });
+  const fila = $("filas").children[Math.min(sig, n - 1)];
+  if (fila && !audio.paused) fila.scrollIntoView({ block: "center" });
+  $("progreso").textContent = `${sig} de ${n} líneas marcadas`;
+  $("terminar").disabled = sig < n || generando;
+}
+
+// ---------------------------------------------------------------- acciones
+function iniciarOContinuar() {
+  audio.playbackRate = parseFloat($("velocidad").value);
+  audio.play().then(() => {
+    if (siguiente() < n) avisar("Escuchando… pulsa <kbd>Espacio</kbd> justo cuando empiece la línea de la derecha.");
+  }).catch(() => avisar("No se pudo reproducir el audio.", "error"));
+}
+function marcar() {
+  const sig = siguiente();
+  if (sig >= n) return;
+  const ini = inicios();
+  let t = Math.max(0, audio.currentTime - adelanto());
+  const previo = sig > 0 ? ini[sig - 1] : null;
+  if (previo != null && t <= previo) t = previo + 0.05;
+  eventos.push({ tipo: "inicio", linea: sig, t: Math.round(t * 1000) / 1000 });
+  if (siguiente() === n) avisar("¡Todas las líneas marcadas! El video se generará al terminar la canción " +
+                                "(o pulsa <b>Terminar y generar video</b>).", "ok");
+  pintar();
+}
+function marcarFin() {
+  const linea = siguiente() - 1;
+  if (linea < 0 || fines()[linea] != null) return;
+  eventos.push({ tipo: "fin", linea, t: Math.round(audio.currentTime * 1000) / 1000 });
+  avisar(`Fin marcado para la línea ${linea + 1} (el texto se quitará durante el instrumental).`);
+  pintar();
+}
+function borrarUltima() {
+  const e = eventos.pop();
+  if (!e) return;
+  avisar(e.tipo === "inicio" ? `Borrada la marca de la línea ${e.linea + 1}: vuelve a marcarla con <kbd>Espacio</kbd>.`
+                             : `Borrado el fin de la línea ${e.linea + 1}.`);
+  pintar();
+}
+function cortarDesdeTiempo(posicion) {
+  const corte = eventos.findIndex(e => e.t > (e.tipo === "inicio" ? posicion - adelanto() : posicion));
+  if (corte >= 0) eventos = eventos.slice(0, corte);
+}
+function retroceder() {
+  const p = Math.max(0, audio.currentTime - 5);
+  cortarDesdeTiempo(p);
+  audio.currentTime = p;
+  avisar(`Retrocediste a ${reloj(p)}. Las marcas posteriores se borraron.`);
+  pintar();
+}
+function rehacerDesde(i) {
+  const ini = inicios();
+  const corte = eventos.findIndex(e => e.tipo === "inicio" && e.linea >= i);
+  const referencia = ini[i] != null ? ini[i] : (i > 0 && ini[i - 1] != null ? ini[i - 1] : 0);
+  if (corte >= 0) eventos = eventos.slice(0, corte);
+  audio.currentTime = Math.max(0, referencia - 3);
+  avisar(`Rehaciendo desde la línea ${i + 1}. Pulsa <kbd>Espacio</kbd> cuando empiece.`);
+  pintar();
+  if (audio.paused) iniciarOContinuar();
+}
+
+async function generar() {
+  if (generando || siguiente() < n) return;
+  generando = true;
+  audio.pause();
+  pintar();
+  avisar("Guardando los tiempos y generando el video…");
+  try {
+    const r = await fetch("generar", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Token": D.token },
+      body: JSON.stringify({ titulo: $("titulo").value, inicios: inicios(), fines: fines() }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "Error al generar");
+    sondeo = setInterval(consultar, 700);
+  } catch (err) {
+    generando = false; pintar();
+    avisar("No se pudo generar: " + err.message, "error");
+  }
+}
+async function consultar() {
+  const e = await (await fetch("estado")).json();
+  if (e.fase === "generando") {
+    $("progreso").textContent = e.mensajes.length ? e.mensajes[e.mensajes.length - 1] : "Generando…";
+    return;
+  }
+  clearInterval(sondeo);
+  generando = false;
+  pintar();
+  if (e.fase === "listo") {
+    avisar(`✔ Video listo: <b>${e.video.split(/[\\/]/).pop()}</b> (los tiempos también quedaron guardados en ${D.json})`, "ok");
+    $("abrir").hidden = false; $("cerrar").hidden = false;
+  } else if (e.fase === "error") {
+    avisar("Error al generar el video: " + e.error, "error");
+  }
+}
+
+// ---------------------------------------------------------------- teclado y eventos
+document.addEventListener("keydown", e => {
+  if (e.target === $("titulo")) { if (e.key === "Enter" || e.key === "Escape") e.target.blur(); return; }
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.repeat || generando) return;
+  if (e.code === "Space") {
+    e.preventDefault();
+    if (audio.paused) iniciarOContinuar(); else marcar();
+  } else if (e.key === "Shift") { e.preventDefault(); borrarUltima(); }
+  else if (e.key === "p" || e.key === "P") { audio.paused ? iniciarOContinuar() : (audio.pause(), avisar("En pausa. <kbd>P</kbd> o <kbd>Espacio</kbd> para continuar.")); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); retroceder(); }
+  else if (e.key === "Enter") { e.preventDefault(); marcarFin(); }
+});
+$("velocidad").addEventListener("change", e => { audio.playbackRate = parseFloat(e.target.value); e.target.blur(); });
+$("adelanto").addEventListener("change", e => e.target.blur());
+for (const id of ["terminar", "abrir", "cerrar"]) $(id).addEventListener("mousedown", e => e.preventDefault());
+$("terminar").addEventListener("click", generar);
+$("abrir").addEventListener("click", () => fetch("abrir", { method: "POST", headers: { "X-Token": D.token } }));
+$("cerrar").addEventListener("click", async () => {
+  await fetch("cerrar", { method: "POST", headers: { "X-Token": D.token } });
+  avisar("Programa cerrado. Ya puedes cerrar esta pestaña.", "ok");
+  ["terminar", "abrir", "cerrar"].forEach(id => $(id).disabled = true);
+});
+audio.addEventListener("timeupdate", () => {
+  $("reloj").textContent = `${reloj(audio.currentTime)} / ${reloj(audio.duration)}`;
+  $("barra").firstElementChild.style.width = (audio.duration ? 100 * audio.currentTime / audio.duration : 0) + "%";
+  pintar();
+});
+audio.addEventListener("loadedmetadata", () => { $("reloj").textContent = `0:00 / ${reloj(audio.duration)}`; });
+audio.addEventListener("ended", () => {
+  if (siguiente() === n) generar();
+  else avisar(`La canción terminó y faltan ${n - siguiente()} líneas por marcar. Usa ↺ en una línea para rehacer desde ahí.`, "error");
+});
+audio.addEventListener("error", () => avisar("No se pudo cargar el audio.", "error"));
+
+construirLista();
+pintar();
+if (siguiente() === n) avisar("Esta canción ya tenía tiempos marcados. Usa ↺ para corregir desde una línea, " +
+                              "o pulsa <b>Terminar y generar video</b> para volver a generarlo.", "ok");
+</script>
+</body>
+</html>

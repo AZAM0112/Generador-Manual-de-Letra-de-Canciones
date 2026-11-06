@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Marcar letra y generar video",
+      "type": "shell",
+      "command": "py -3.12 marcar.py",
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Rehacer solo el video (con los tiempos ya marcados)",
+      "type": "shell",
+      "command": "py -3.12 marcar.py --solo-video",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+Pillow>=10.1          # dibujo de la letra
+imageio-ffmpeg>=0.4   # trae ffmpeg si no lo tienes instalado en el sistema
